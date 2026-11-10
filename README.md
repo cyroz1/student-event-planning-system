@@ -22,7 +22,12 @@ Built as the group software development project for COM-430. Due November 15, 20
 ## Group members
 
 - Amir Limame
-- (add members here)
+- Ali Alsulaiti
+- Breylan Laguerre
+- Jalendorien Asuncion
+- Zeid Ayoub
+
+GitHub collaborator invites are pending each member's GitHub username (asked in the Teams group chat on Nov 10, 2026).
 
 ## Getting started
 
