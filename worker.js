@@ -6,8 +6,9 @@ async function passwordHash(password, salt) {
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: encoder.encode(salt), iterations: 100000, hash: 'SHA-256' }, key, 256));
 }
-function json(data, status = 200, headers = {}) { return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } }); }
-function token(request) { return request.headers.get('Cookie')?.split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8); }
+const securityHeaders = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()', 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" };
+function json(data, status = 200, headers = {}) { return Response.json(data, { status, headers: { ...securityHeaders, 'Cache-Control': 'no-store', ...headers } }); }
+function token(request) { const value = request.headers.get('Cookie')?.split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8); return /^[a-f0-9]{64}$/.test(value || '') ? value : null; }
 async function session(request, db) {
   const value = token(request); if (!value) return null;
   return db.prepare('SELECT users.id, users.name, users.email, users.role FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?').bind(await hash(value), Date.now()).first();
@@ -17,21 +18,38 @@ async function signIn(db, user) {
   await db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').bind(await hash(value), user.id, Date.now() + 28800000).run();
   return json({ user }, 200, { 'Set-Cookie': `session=${value}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800` });
 }
+async function readJson(request) {
+  if (!request.body) throw new Error('invalid');
+  const reader = request.body.getReader(); let size = 0; const chunks = [];
+  while (true) { const { done, value } = await reader.read(); if (done) break; size += value.length; if (size > 10000) { await reader.cancel(); throw new RangeError('too large'); } chunks.push(value); }
+  const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
 export default { async fetch(request, env) {
   const url = new URL(request.url);
-  if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+  if (!url.pathname.startsWith('/api/')) {
+    const response = await env.ASSETS.fetch(request); const headers = new Headers(response.headers);
+    for (const [name, value] of Object.entries(securityHeaders)) headers.set(name, value);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
   try {
     if (request.method === 'GET' && url.pathname === '/api/session') return json({ user: await session(request, env.DB) });
+    if (request.method === 'POST' && request.headers.get('Origin') !== url.origin) return json({ error: 'Request origin is not allowed.' }, 403);
     if (request.method === 'POST' && url.pathname === '/api/logout') {
       const value = token(request); if (value) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hash(value)).run();
       return json({ ok: true }, 200, { 'Set-Cookie': 'session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' });
     }
     if (request.method !== 'POST' || !['/api/register', '/api/login'].includes(url.pathname)) return json({ error: 'Not found.' }, 404);
+    const ip = request.headers.get('CF-Connecting-IP');
+    if (!ip) return json({ error: 'Unable to process request.' }, 400);
+    if (!(await env.AUTH_IP_LIMIT.limit({ key: ip })).success) return json({ error: 'Too many attempts. Please try again later.' }, 429, { 'Retry-After': '60' });
+    if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Invalid request.' }, 415);
     if (Number(request.headers.get('Content-Length')) > 10000) return json({ error: 'Request too large.' }, 413);
-    let input; try { input = await request.json(); } catch { return json({ error: 'Invalid request.' }, 400); }
+    let input; try { input = await readJson(request); } catch (error) { return json({ error: error instanceof RangeError ? 'Request too large.' : 'Invalid request.' }, error instanceof RangeError ? 413 : 400); }
     const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
     const password = typeof input?.password === 'string' ? input.password : '';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 8 || password.length > 128) return json({ error: 'Enter a valid email and a password of 8–128 characters.' }, 400);
+    if (!(await env.AUTH_ACCOUNT_LIMIT.limit({ key: await hash(email) })).success) return json({ error: 'Too many attempts. Please try again later.' }, 429, { 'Retry-After': '60' });
     if (url.pathname === '/api/register') {
       const name = typeof input.name === 'string' ? input.name.trim() : '';
       if (!name || name.length > 100 || !['student', 'organizer'].includes(input.role)) return json({ error: 'Enter your name and choose a role.' }, 400);
@@ -49,4 +67,3 @@ export default { async fetch(request, env) {
     return signIn(env.DB, { id: account.id, name: account.name, email: account.email, role: account.role });
   } catch (error) { console.error(error); return json({ error: 'Something went wrong. Please try again.' }, 500); }
 } };
-

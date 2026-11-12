@@ -132,3 +132,7 @@ Before presenting or extending the prototype, test both roles; invalid and dupli
 The project is a prototype. It does not yet have email verification, password reset, rate limiting, session cleanup, audit logging, or automated tests. It also does not verify that an organizer is authorized by the university. Account registration is public, and the current password-hashing cost is constrained by the Worker runtime. Avoid using sensitive or reused passwords; a production system should use a reviewed authentication provider or a stronger production-ready authentication design.
 
 The SEPS calendar-and-star logo also serves as the favicon. Cloudflare uses `public/logo.svg`; the Node version uses the matching root `logo.svg`. Keep both copies synchronized if the logo changes.
+
+## Security update
+
+The deployed Worker limits account requests by IP and submitted email, checks the origin for POST requests, limits request body size, and sends browser security headers. These are approximate Cloudflare location-level limits and can affect people sharing a network. Password hashes and existing accounts were not changed. The organizer role remains self-selected and must not grant privileged access without a separate authorization process. This does not add email verification, recovery, or MFA and does not make the prototype production-ready.

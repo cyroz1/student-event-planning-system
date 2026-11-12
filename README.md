@@ -54,3 +54,9 @@ A repository administrator must complete this one-time setup:
 3. Commit and push the application files and the workflow to `main`. In GitHub's **Actions** tab, check that **Deploy to Cloudflare Workers** succeeds. Later pushes to `main` trigger it automatically.
 
 Do not put the API token in a file or commit it. Anyone who can change the deployment workflow on `main` can potentially use its secret, so protect the branch and review changes. The older GitHub Pages workflow publishes a separate static copy and does not provide the account backend; the Cloudflare URL is the working application.
+
+## Account security notes
+
+The Cloudflare Worker limits login and registration attempts by IP address and by a hash of the submitted email, checks the request origin for account changes, bounds request size, and adds browser security headers. Cloudflare's rate limits are approximate and scoped to individual locations; shared networks may encounter limits together, and these controls are not a complete defense against distributed attacks. Existing accounts and password hashes continue to work.
+
+This remains a class prototype. Passwords use 100,000 PBKDF2-SHA-256 iterations, below current OWASP guidance. There is no email verification, password recovery, or multi-factor authentication. The organizer role is self-selected and must not be treated as proof of authority. Future protected routes must verify the session and implement server-side authorization. Use test data and unique passwords; use a reviewed authentication provider and a full security review before public production use.
