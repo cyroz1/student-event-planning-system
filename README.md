@@ -26,4 +26,31 @@ Built as the group software development project for COM-430. Due November 15, 20
 
 ## Getting started
 
-Setup instructions will be added once the prototype stack is chosen.
+See [Person 1 contribution and handoff](CONTRIBUTION_PERSON_1.md) for the architecture, account API, setup, and guidance for the remaining requirements.
+
+## Running the prototype
+
+Install Node.js 18 or newer, then run `node server.js` from the project directory and open http://localhost:3000. No additional packages are required. The optional `PORT` environment variable changes the listening port.
+
+Students and organizers can create an account, sign in, and sign out. Accounts are stored locally in `data/users.json` with salted password hashes; this file is ignored by Git. Sessions expire after eight hours and are cleared when the server restarts. Event management, browsing, registration, and notifications are planned for later phases.
+
+This is a local course prototype. Before public deployment, add HTTPS, persistent session storage, rate limiting, account recovery, and a production database; set `NODE_ENV=production` when serving over HTTPS to enable secure cookies.
+
+## Cloudflare Workers deployment
+
+The Worker serves the page from `public/` and uses a Cloudflare D1 database for accounts and sessions. Install Wrangler (`npm install --save-dev wrangler`), authenticate with `npx wrangler login`, then create a database with `npx wrangler d1 create seps-db`. If using a different Cloudflare account, replace the database ID in `wrangler.jsonc` with the returned ID. Initialize it using `npx wrangler d1 execute seps-db --remote --file=schema.sql`, then deploy with `npx wrangler deploy`. For local development, initialize the local database with `npx wrangler d1 execute seps-db --local --file=schema.sql` and run `npx wrangler dev`.
+
+The Cloudflare deployment has separate data from the Node prototype. It uses PBKDF2 password hashes and stores hashed session tokens in D1. Before public use, add rate limiting, account recovery, and expired-session cleanup.
+
+
+## Automatic deployment from GitHub
+
+The `.github/workflows/cloudflare.yml` workflow deploys the Worker when a commit is pushed or merged into `main`. Group members only need permission to contribute to the GitHub repository; they do not need Cloudflare access. Changes to `worker.js`, `wrangler.jsonc`, and `public/` are included. Database schema changes are not applied automatically and must be coordinated separately.
+
+A repository administrator must complete this one-time setup:
+
+1. Create a Cloudflare API token with permission to edit Workers in the Cloudflare account that owns the site. Scope it to that account. Keep the token private.
+2. In the GitHub repository, open **Settings → Secrets and variables → Actions**. Under **Secrets**, add `CLOUDFLARE_API_TOKEN` with that token. Under **Variables**, add `CLOUDFLARE_ACCOUNT_ID` with the account ID from the Cloudflare dashboard.
+3. Commit and push the application files and the workflow to `main`. In GitHub's **Actions** tab, check that **Deploy to Cloudflare Workers** succeeds. Later pushes to `main` trigger it automatically.
+
+Do not put the API token in a file or commit it. Anyone who can change the deployment workflow on `main` can potentially use its secret, so protect the branch and review changes. The older GitHub Pages workflow publishes a separate static copy and does not provide the account backend; the Cloudflare URL is the working application.

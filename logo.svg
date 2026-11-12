@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SEPS calendar logo">
+  <rect width="64" height="64" rx="15" fill="#194c3b"/>
+  <path d="M15 23h34v25H15z" fill="#fff"/>
+  <path d="M15 20a4 4 0 0 1 4-4h26a4 4 0 0 1 4 4v7H15z" fill="#d0ad5a"/>
+  <path d="M23 12v9M41 12v9" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 31l2.3 4.6 5.1.8-3.7 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1-3.7-3.6 5.1-.8z" fill="#194c3b"/>
+</svg>

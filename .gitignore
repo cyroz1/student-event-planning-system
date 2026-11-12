@@ -19,3 +19,7 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+
+data/
+
+.wrangler/
