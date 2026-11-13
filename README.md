@@ -27,7 +27,7 @@ Built as the group software development project for COM-430. Due November 15, 20
 - Jalendorien Asuncion
 - Zeid Ayoub
 
-GitHub collaborator invites are pending each member's GitHub username (asked in the Teams group chat on Nov 10, 2026).
+GitHub collaborator invites were sent on November 12, 2026 and are pending acceptance.
 
 ## Getting started
 
