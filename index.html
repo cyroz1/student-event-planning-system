@@ -58,7 +58,41 @@
     <div id="my-events" class="event-list"></div>
   </div>
 </section>
-
+<section class="workspace" id="browse-events" aria-label="Browse Events" style="display:none;">
+  <div class="card" style="grid-column: 1 / -1;">
+    <span class="eyebrow">Discover Events &middot; FR3</span>
+    <h2>Upcoming campus events</h2>
+    <p>Search and filter events by name, category, or date.</p>
+    <form id="search-form" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:end; margin-bottom:1.5rem;">
+      <div style="flex:1; min-width:180px;">
+        <label for="search-q">Search</label>
+        <input type="search" id="search-q" placeholder="Event name...">
+      </div>
+      <div style="flex:1; min-width:160px;">
+        <label for="search-category">Category</label>
+        <select id="search-category">
+          <option value="">All categories</option>
+          <option value="Seminar">Seminar</option>
+          <option value="Workshop">Workshop</option>
+          <option value="Cultural">Cultural</option>
+          <option value="Academic">Academic</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div style="flex:1; min-width:160px;">
+        <label for="search-date">Date</label>
+        <input type="date" id="search-date">
+      </div>
+      <div>
+        <button type="submit" class="submit" style="margin-top:0; width:auto; padding:.75rem 1.2rem;">Search</button>
+      </div>
+      <div>
+        <button type="button" id="clear-search" class="btn-secondary">Clear</button>
+      </div>
+    </form>
+    <div id="events-list" class="event-list"></div>
+  </div>
+</section>
 <footer>Student Event Planning System &middot; COM-430</footer>
 <script>
 const $ = id => document.getElementById(id);
@@ -160,6 +194,7 @@ function showUser(user) {
       ? 'Use the Event Management dashboard below to create, edit, or cancel your events.'
       : 'Event browsing and registration features are coming in the next project phase.';
     if (isOrganizer) loadMyEvents();
+    showBrowseSection();
   } else {
     resetEventForm();
   }
@@ -242,7 +277,62 @@ $('logout').onclick = async () => {
     $('account-info').textContent = 'Could not log out. Please try again.';
   }
 };
+async function loadEvents() {
+  const params = new URLSearchParams();
+  const q = $('search-q')?.value.trim();
+  const category = $('search-category')?.value;
+  const date = $('search-date')?.value;
+  if (q) params.set('q', q);
+  if (category) params.set('category', category);
+  if (date) params.set('date', date);
 
+  const container = $('events-list');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/events?' + params.toString());
+    const data = await res.json();
+    const events = data.events || [];
+
+    if (!events.length) {
+      container.innerHTML = '<p>No upcoming events found.</p>';
+      return;
+    }
+
+    container.innerHTML = events.map(ev => `
+      <article class="event-item">
+        <div class="event-head">
+          <h3 class="event-title">${escapeHtml(ev.title)}</h3>
+          <span class="badge badge-active">${escapeHtml(ev.category)}</span>
+        </div>
+        <div class="event-meta">${escapeHtml(ev.event_date)} at ${escapeHtml(ev.event_time)} &middot; ${escapeHtml(ev.venue)}</div>
+        <p class="event-desc">${escapeHtml(ev.description || '')}</p>
+      </article>
+    `).join('');
+  } catch {
+    container.innerHTML = '<p>Unable to load events right now.</p>';
+  }
+}
+
+function showBrowseSection() {
+  const browse = $('browse-events');
+  if (browse) {
+    browse.style.display = 'block';
+    loadEvents();
+  }
+}
+
+$('search-form')?.addEventListener('submit', e => {
+  e.preventDefault();
+  loadEvents();
+});
+
+$('clear-search')?.addEventListener('click', () => {
+  $('search-q').value = '';
+  $('search-category').value = '';
+  $('search-date').value = '';
+  loadEvents();
+});
 fetch('/api/session').then(r => r.json()).then(data => showUser(data.user)).catch(() => { $('message').textContent = 'Unable to connect to the server.'; });
 </script>
 </body>
