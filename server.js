@@ -55,9 +55,30 @@ http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync(path.join(root, 'index.html'))); }
     if (req.method === 'GET' && url.pathname === '/api/session') return send(res, 200, { user: current(req) });
     if (req.method === 'GET' && url.pathname === '/api/events') {
-      const sorted = events().sort((a, b) => `${a.event_date} ${a.event_time}`.localeCompare(`${b.event_date} ${b.event_time}`));
-      return send(res, 200, { events: sorted });
-    }
+  const category = url.searchParams.get('category') || '';
+  const date = url.searchParams.get('date') || '';
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+  let list = events().filter(e => e.status !== 'canceled');
+
+  if (category && CATEGORIES.includes(category)) {
+    list = list.filter(e => e.category === category);
+  }
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    list = list.filter(e => e.event_date === date);
+  }
+  if (q) {
+    list = list.filter(e =>
+      e.title.toLowerCase().includes(q) ||
+      (e.description && e.description.toLowerCase().includes(q)) ||
+      (e.venue && e.venue.toLowerCase().includes(q))
+    );
+  }
+  const sorted = list.sort((a, b) =>
+    `${a.event_date} ${a.event_time}`.localeCompare(`${b.event_date} ${b.event_time}`)
+  );
+  return send(res, 200, { events: sorted });
+}
     if (req.method === 'POST' && url.pathname === '/api/logout') {
       const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8);
       sessions.delete(token); res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); return send(res, 200, { ok: true });
