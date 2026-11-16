@@ -25,6 +25,35 @@ async function readJson(request) {
   const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return JSON.parse(new TextDecoder().decode(bytes));
 }
+const DEFAULT_CAPACITY = 50;
+const EVENT_DETAIL_COLUMNS = `events.id, events.title, events.category, events.event_date, events.event_time, events.venue, events.description, events.status, events.capacity,
+  COALESCE(users.name, 'Campus organizer') AS organizer_name,
+  (SELECT COUNT(*) FROM event_registrations WHERE event_registrations.event_id = events.id) AS registered_count,
+  EXISTS(SELECT 1 FROM event_registrations WHERE event_registrations.event_id = events.id AND event_registrations.user_id = ?) AS is_registered`;
+function currentMoment() {
+  const now = new Date();
+  const pad = value => String(value).padStart(2, '0');
+  return { date: `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`, time: `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}` };
+}
+function hasNotStarted(event, moment) {
+  return event.event_date > moment.date || (event.event_date === moment.date && event.event_time >= moment.time);
+}
+function eventDetailRow(db, eventId, viewerId) {
+  return db.prepare(`SELECT ${EVENT_DETAIL_COLUMNS} FROM events LEFT JOIN users ON users.id = events.organizer_id WHERE events.id = ?`)
+    .bind(viewerId || '', eventId).first();
+}
+function eventDetailPayload(row) {
+  const capacity = Number(row.capacity) > 0 ? Number(row.capacity) : DEFAULT_CAPACITY;
+  const registered_count = Number(row.registered_count) || 0;
+  return {
+    ...row,
+    capacity,
+    registered_count,
+    remaining_spots: Math.max(0, capacity - registered_count),
+    is_registered: Boolean(row.is_registered),
+    has_started: !hasNotStarted(row, currentMoment())
+  };
+}
 const CATEGORIES = ['Seminar', 'Workshop', 'Cultural', 'Academic', 'Other'];
 function validateEvent(input) {
   const title = typeof input?.title === 'string' ? input.title.trim() : '';
@@ -54,10 +83,60 @@ export default { async fetch(request, env) {
       const { results } = await env.DB.prepare('SELECT * FROM events ORDER BY event_date ASC, event_time ASC').all();
       return json({ events: results || [] });
     }
+    if (request.method === 'GET' && url.pathname === '/api/my-registrations') {
+      const viewer = await session(request, env.DB);
+      if (!viewer) return json({ error: 'You must be logged in to view your registrations.' }, 401);
+      const { results } = await env.DB.prepare(`SELECT events.id, events.title, events.category, events.event_date, events.event_time, events.venue, events.status, event_registrations.registered_at
+        FROM event_registrations JOIN events ON events.id = event_registrations.event_id
+        WHERE event_registrations.user_id = ?
+        ORDER BY events.event_date ASC, events.event_time ASC`).bind(viewer.id).all();
+      const moment = currentMoment();
+      return json({ events: (results || []).map(row => ({ ...row, has_started: !hasNotStarted(row, moment) })) });
+    }
+    const detailMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)$/);
+    if (request.method === 'GET' && detailMatch) {
+      const viewer = await session(request, env.DB);
+      const row = await eventDetailRow(env.DB, detailMatch[1], viewer?.id);
+      if (!row) return json({ error: 'Event not found.' }, 404);
+      return json({ event: eventDetailPayload(row) });
+    }
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) && request.headers.get('Origin') !== url.origin) return json({ error: 'Request origin is not allowed.' }, 403);
     if (request.method === 'POST' && url.pathname === '/api/logout') {
       const value = token(request); if (value) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hash(value)).run();
       return json({ ok: true }, 200, { 'Set-Cookie': 'session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' });
+    }
+    const registerMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)\/register$/);
+    if (registerMatch && (request.method === 'POST' || request.method === 'DELETE')) {
+      const viewer = await session(request, env.DB);
+      if (!viewer) return json({ error: 'You must be logged in to register for an event.' }, 401);
+      const eventId = registerMatch[1];
+      const event = await env.DB.prepare('SELECT id, status, event_date, event_time, capacity FROM events WHERE id = ?').bind(eventId).first();
+      if (!event) return json({ error: 'Event not found.' }, 404);
+      const moment = currentMoment();
+      if (request.method === 'POST') {
+        if (event.status !== 'active') return json({ error: 'This event is not open for registration.' }, 400);
+        if (!hasNotStarted(event, moment)) return json({ error: 'This event has already started. Registration is closed.' }, 400);
+        const existing = await env.DB.prepare('SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?').bind(eventId, viewer.id).first();
+        if (existing) return json({ error: 'You are already registered for this event.' }, 409);
+        let inserted;
+        try {
+          inserted = await env.DB.prepare(`INSERT INTO event_registrations (id, user_id, event_id, registered_at)
+            SELECT ?, ?, events.id, ? FROM events
+            WHERE events.id = ? AND events.status = 'active'
+              AND (SELECT COUNT(*) FROM event_registrations WHERE event_registrations.event_id = events.id) < events.capacity`)
+            .bind(crypto.randomUUID(), viewer.id, Date.now(), eventId).run();
+        } catch (error) {
+          const duplicate = await env.DB.prepare('SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?').bind(eventId, viewer.id).first();
+          if (duplicate) return json({ error: 'You are already registered for this event.' }, 409);
+          throw error;
+        }
+        if (!inserted.meta.changes) return json({ error: 'This event is full. Registration is closed.' }, 400);
+        return json({ event: eventDetailPayload(await eventDetailRow(env.DB, eventId, viewer.id)) }, 201);
+      }
+      if (!hasNotStarted(event, moment)) return json({ error: 'This event has already started. Your registration can no longer be cancelled.' }, 400);
+      const removed = await env.DB.prepare('DELETE FROM event_registrations WHERE event_id = ? AND user_id = ?').bind(eventId, viewer.id).run();
+      if (!removed.meta.changes) return json({ error: 'You are not registered for this event.' }, 404);
+      return json({ event: eventDetailPayload(await eventDetailRow(env.DB, eventId, viewer.id)) });
     }
     if (url.pathname === '/api/events' || url.pathname.startsWith('/api/events/')) {
       const user = await session(request, env.DB);

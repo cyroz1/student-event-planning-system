@@ -7,14 +7,18 @@ const scrypt = promisify(crypto.scrypt);
 const root = __dirname;
 const dataPath = path.join(root, 'data', 'users.json');
 const eventsPath = path.join(root, 'data', 'events.json');
+const registrationsPath = path.join(root, 'data', 'registrations.json');
 const sessions = new Map();
 const port = Number(process.env.PORT) || 3000;
 fs.mkdirSync(path.dirname(dataPath), { recursive: true });
 if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, '[]', { mode: 0o600 });
 if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, '[]', { mode: 0o600 });
+if (!fs.existsSync(registrationsPath)) fs.writeFileSync(registrationsPath, '[]', { mode: 0o600 });
 function users() { return JSON.parse(fs.readFileSync(dataPath, 'utf8')); }
 function events() { return JSON.parse(fs.readFileSync(eventsPath, 'utf8')); }
 function saveEvents(list) { fs.writeFileSync(eventsPath, JSON.stringify(list, null, 2), { mode: 0o600 }); }
+function registrations() { return JSON.parse(fs.readFileSync(registrationsPath, 'utf8')); }
+function saveRegistrations(list) { fs.writeFileSync(registrationsPath, JSON.stringify(list, null, 2), { mode: 0o600 }); }
 function send(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
 function current(req) {
   const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8);
@@ -43,6 +47,50 @@ function validateEvent(input) {
   if (!venue || venue.length > 120) return { error: 'Enter a venue (up to 120 characters).' };
   if (!description || description.length > 1000) return { error: 'Enter a description (up to 1000 characters).' };
   return { data: { title, category, event_date, event_time, venue, description } };
+}
+const DEFAULT_CAPACITY = 50;
+function eventCapacity(event) {
+  const value = Number(event?.capacity);
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_CAPACITY;
+}
+function currentMoment() {
+  const now = new Date();
+  const pad = value => String(value).padStart(2, '0');
+  return { date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, time: `${pad(now.getHours())}:${pad(now.getMinutes())}` };
+}
+function hasNotStarted(event, moment) {
+  return event.event_date > moment.date || (event.event_date === moment.date && event.event_time >= moment.time);
+}
+function registrationCount(list, eventId) {
+  return list.filter(row => row.event_id === eventId).length;
+}
+function isRegistered(list, eventId, userId) {
+  return Boolean(userId) && list.some(row => row.event_id === eventId && row.user_id === userId);
+}
+function organizerNames() {
+  const names = new Map();
+  for (const account of users()) names.set(account.id, account.name);
+  return names;
+}
+function eventDetail(event, list, viewerId) {
+  const capacity = eventCapacity(event);
+  const registered_count = registrationCount(list, event.id);
+  return {
+    id: event.id,
+    title: event.title,
+    category: event.category,
+    event_date: event.event_date,
+    event_time: event.event_time,
+    venue: event.venue,
+    description: event.description,
+    status: event.status,
+    capacity,
+    registered_count,
+    remaining_spots: Math.max(0, capacity - registered_count),
+    organizer_name: organizerNames().get(event.organizer_id) || 'Campus organizer',
+    has_started: !hasNotStarted(event, currentMoment()),
+    is_registered: isRegistered(list, event.id, viewerId)
+  };
 }
 async function readBody(req) {
   let body = ''; for await (const chunk of req) { body += chunk; if (body.length > 10000) throw new RangeError('too large'); }
@@ -79,6 +127,61 @@ http.createServer(async (req, res) => {
   );
   return send(res, 200, { events: sorted });
 }
+    if (req.method === 'GET' && url.pathname === '/api/my-registrations') {
+      const viewer = current(req);
+      if (!viewer) return send(res, 401, { error: 'You must be logged in to view your registrations.' });
+      const byId = new Map(events().map(event => [event.id, event]));
+      const mine = registrations()
+        .filter(row => row.user_id === viewer.id && byId.has(row.event_id))
+        .map(row => {
+          const event = byId.get(row.event_id);
+          return {
+            id: event.id,
+            title: event.title,
+            category: event.category,
+            event_date: event.event_date,
+            event_time: event.event_time,
+            venue: event.venue,
+            status: event.status,
+            has_started: !hasNotStarted(event, currentMoment()),
+            registered_at: row.registered_at
+          };
+        })
+        .sort((a, b) => `${a.event_date} ${a.event_time}`.localeCompare(`${b.event_date} ${b.event_time}`));
+      return send(res, 200, { events: mine });
+    }
+    const registerMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)\/register$/);
+    if (registerMatch && (req.method === 'POST' || req.method === 'DELETE')) {
+      const viewer = current(req);
+      if (!viewer) return send(res, 401, { error: 'You must be logged in to register for an event.' });
+      const eventId = registerMatch[1];
+      const event = events().find(item => item.id === eventId);
+      if (!event) return send(res, 404, { error: 'Event not found.' });
+      const moment = currentMoment();
+      if (req.method === 'POST') {
+        if (event.status !== 'active') return send(res, 400, { error: 'This event is not open for registration.' });
+        if (!hasNotStarted(event, moment)) return send(res, 400, { error: 'This event has already started. Registration is closed.' });
+        const all = registrations();
+        if (isRegistered(all, eventId, viewer.id)) return send(res, 409, { error: 'You are already registered for this event.' });
+        if (registrationCount(all, eventId) >= eventCapacity(event)) return send(res, 400, { error: 'This event is full. Registration is closed.' });
+        all.push({ id: crypto.randomUUID(), user_id: viewer.id, event_id: eventId, registered_at: Date.now() });
+        saveRegistrations(all);
+        return send(res, 201, { event: eventDetail(event, all, viewer.id) });
+      }
+      if (!hasNotStarted(event, moment)) return send(res, 400, { error: 'This event has already started. Your registration can no longer be cancelled.' });
+      const all = registrations();
+      const index = all.findIndex(row => row.event_id === eventId && row.user_id === viewer.id);
+      if (index === -1) return send(res, 404, { error: 'You are not registered for this event.' });
+      all.splice(index, 1);
+      saveRegistrations(all);
+      return send(res, 200, { event: eventDetail(event, all, viewer.id) });
+    }
+    const detailMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)$/);
+    if (req.method === 'GET' && detailMatch) {
+      const event = events().find(item => item.id === detailMatch[1]);
+      if (!event) return send(res, 404, { error: 'Event not found.' });
+      return send(res, 200, { event: eventDetail(event, registrations(), current(req)?.id) });
+    }
     if (req.method === 'POST' && url.pathname === '/api/logout') {
       const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8);
       sessions.delete(token); res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); return send(res, 200, { ok: true });
