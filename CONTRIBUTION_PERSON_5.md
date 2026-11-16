@@ -40,7 +40,7 @@ After saving the event edit, call `notifyEventUpdated(env, oldEvent, newEvent)`.
 Everyone:
 The `notifications` table will be created in the D1 database the Worker is linked to. As a group, decide where to create it before deploying to the shared remote database.
 ## Testing
-Run `npx wrangler dev` and visit http://localhost:8787.
+Run `npx wrangler dev` and visit http://localhost:3000.
 Log in and check the Notifications section displays "No notifications yet."
 After the triggers have been called by FR2 and FR4, register for an event, make changes and cancel. Check the messages are only visible to registered students.
 Log in as a student who isn’t registered and check there are no notifications.
