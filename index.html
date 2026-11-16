@@ -6,10 +6,11 @@
 <link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
 :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#1d3129;background:#f6f5f0}*{box-sizing:border-box}body{margin:0}header{background:#fff;border-bottom:1px solid #e2e8f0}nav{max-width:1100px;margin:auto;padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:.65rem;font-weight:800;color:#194c3b;text-decoration:none;letter-spacing:.04em}.brand img{width:40px;height:40px}nav a:not(.brand){color:#40516a;text-decoration:none;font-size:.9rem}main{max-width:1100px;margin:auto;padding:4rem 1.5rem;display:grid;grid-template-columns:1.15fr .85fr;gap:4rem;align-items:start}.eyebrow{text-transform:uppercase;letter-spacing:.13em;font-weight:700;color:#286344;font-size:.75rem}h1{font-size:clamp(2.3rem,5vw,4rem);line-height:1.08;letter-spacing:-.04em;margin:.8rem 0 1.3rem}p{line-height:1.7;color:#586a80}.intro{font-size:1.1rem;max-width:590px}.features{display:grid;gap:1rem;margin-top:2.5rem}.feature{border-left:3px solid #c8a451;padding-left:1rem}.feature strong{display:block}.feature span{color:#66778c;font-size:.9rem}.card{background:white;border:1px solid #e4e4d9;border-radius:16px;padding:2rem;box-shadow:0 12px 40px #183b6410}.tabs{display:flex;border-bottom:1px solid #e4e4d9;margin-bottom:1.5rem}.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:.6rem 1rem;cursor:pointer;color:#62728a;font:inherit;font-weight:600}.tabs button[aria-selected=true]{color:#194c3b;border-color:#286344}h2{margin:.3rem 0}label{display:block;font-size:.9rem;font-weight:600;margin:1rem 0 .4rem}input,select,textarea{width:100%;padding:.75rem;border:1px solid #b9c7d7;border-radius:7px;font:inherit;background:white}textarea{min-height:90px;resize:vertical}input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid #d8c17f;outline-offset:2px}.submit{width:100%;border:0;border-radius:7px;background:#194c3b;color:white;padding:.85rem;font:inherit;font-weight:700;cursor:pointer;margin-top:1.4rem}.submit:hover{background:#23614c}.btn-secondary{border:1px solid #b9c7d7;border-radius:7px;background:white;color:#1d3129;padding:.55rem .9rem;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer}.btn-danger{border:1px solid #d99b9b;border-radius:7px;background:#fff5f5;color:#a32a2a;padding:.55rem .9rem;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer}.message{min-height:1.5em;color:#a32a2a;font-size:.9rem;margin:.8rem 0 0}.success{color:#194c3b}.hidden{display:none}.workspace{max-width:1100px;margin:0 auto 4rem;padding:0 1.5rem;display:grid;grid-template-columns:1fr 1.15fr;gap:2.5rem;align-items:start}.row-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.btn-row{display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap}.event-list{display:grid;gap:1rem;margin-top:1rem}.event-item{border:1px solid #e4e4d9;border-radius:12px;padding:1.25rem;background:#fcfbf8}.event-item.canceled{opacity:.72;background:#f8f4f4}.event-head{display:flex;justify-content:space-between;align-items:start;gap:.75rem}.event-title{font-weight:700;font-size:1.05rem;color:#1d3129;margin:0}.badge{font-size:.75rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;text-transform:uppercase;letter-spacing:.05em}.badge-active{background:#e3f1ea;color:#194c3b}.badge-canceled{background:#fbe4e4;color:#a32a2a}.event-meta{font-size:.85rem;color:#40516a;margin:.45rem 0}.event-desc{font-size:.9rem;color:#586a80;margin:.5rem 0 0}footer{border-top:1px solid #e4e4d9;padding:1.5rem;text-align:center;color:#718096;font-size:.85rem}@media(max-width:750px){main,.workspace{grid-template-columns:1fr;gap:2rem;padding-top:2.5rem}.card{padding:1.5rem}.row-2{grid-template-columns:1fr}}
+.fr4-panel{max-width:1100px;margin:0 auto 4rem;padding:0 1.5rem}.breadcrumb{display:block;margin:0 0 1.2rem;font-size:.85rem;color:#66778c}.breadcrumb a{color:#286344;text-decoration:none;font-weight:600}.breadcrumb a:hover{text-decoration:underline}.breadcrumb i{font-style:normal;margin:0 .45rem;color:#b9c7d7}.detail-grid{display:grid;grid-template-columns:1.5fr .85fr;gap:2rem;align-items:start}.detail-meta{display:grid;gap:.9rem;margin:1.5rem 0}.detail-meta div{font-size:.95rem;color:#1d3129}.detail-meta strong{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:#66778c;font-weight:700;margin-bottom:.15rem}.capacity-figure{font-size:2rem;font-weight:800;color:#194c3b;letter-spacing:-.03em;margin:.3rem 0}.spots{font-size:.85rem;font-weight:700;color:#194c3b;margin:.6rem 0 0}.spots.full{color:#a32a2a}.empty{border:1px dashed #b9c7d7;border-radius:12px;padding:2.5rem 1.5rem;text-align:center;color:#66778c;margin-top:1rem;background:#fcfbf8}@media(max-width:750px){.detail-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header><nav><a class="brand" href="/"><img src="/logo.svg" alt="">SEPS</a><a href="#account">Your account</a></nav></header>
+<header><nav><a class="brand" href="/"><img src="/logo.svg" alt="">SEPS</a><span><a href="#/my-events" id="nav-my-events" style="display:none;margin-right:1.2rem">My events</a><a href="#account">Your account</a></span></nav></header>
 <main>
 <section><span class="eyebrow">Saint Leo University &middot; Campus life</span><h1>Bring your campus together.</h1><p class="intro">The Student Event Planning System helps students and organizations plan, discover, and manage campus events in one place.</p><div class="features"><div class="feature"><strong>For students</strong><span>Connect with seminars, workshops, and campus activities.</span></div><div class="feature"><strong>For organizers</strong><span>Bring your event ideas to the university community.</span></div><div class="feature"><strong>One campus community</strong><span>Make it easier to participate in the events that matter to you.</span></div></div></section>
 <section class="card" id="account" aria-label="Account"><div id="auth"><div class="tabs" role="tablist" aria-label="Account options"><button type="button" role="tab" id="login-tab" aria-selected="true">Log in</button><button type="button" role="tab" id="register-tab" aria-selected="false">Create account</button></div><h2 id="form-title">Welcome back</h2><p id="form-description">Log in to your SEPS account.</p><form id="form"><div id="registration-fields" class="hidden"><label for="name">Full name</label><input id="name" name="name" autocomplete="name" maxlength="100"><label for="role">I am a</label><select id="role" name="role"><option value="student">Student</option><option value="organizer">Event organizer</option></select></div><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"><button class="submit" id="submit" type="submit">Log in</button><p class="message" id="message" role="status" aria-live="polite"></p></form></div><div id="signed-in" class="hidden"><span class="eyebrow">Signed in</span><h2 id="welcome"></h2><p id="account-info"></p><p id="role-hint"></p><button class="submit" id="logout" type="button">Log out</button></div></section>
@@ -92,6 +93,21 @@
     </form>
     <div id="events-list" class="event-list"></div>
   </div>
+</section>
+<section class="fr4-panel" id="detail-panel" aria-label="Event details" style="display:none;">
+  <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#account">Home</a><i>&rsaquo;</i><a href="#browse-events">Browse events</a><i>&rsaquo;</i><span id="detail-crumb">Event</span></nav>
+  <div id="detail-body"></div>
+</section>
+<section class="fr4-panel" id="my-registrations-panel" aria-label="My events" style="display:none;">
+  <nav class="breadcrumb" aria-label="Breadcrumb"><a href="#account">Home</a><i>&rsaquo;</i>My events</nav>
+  <div class="card">
+    <span class="eyebrow">Event Registration &middot; FR4</span>
+    <h2>My events</h2>
+    <p>Every event you have registered for, with the soonest first.</p>
+    <p class="message" id="my-registrations-count" role="status" aria-live="polite" style="color:#66778c"></p>
+    <p class="message" id="my-registrations-message" role="status" aria-live="polite"></p>
+  </div>
+  <div id="my-registrations-list" class="event-list"></div>
 </section>
 <footer>Student Event Planning System &middot; COM-430</footer>
 <script>
@@ -198,6 +214,7 @@ function showUser(user) {
   } else {
     resetEventForm();
   }
+  showView();
 }
 
 function setMode(value) {
@@ -307,8 +324,15 @@ async function loadEvents() {
         </div>
         <div class="event-meta">${escapeHtml(ev.event_date)} at ${escapeHtml(ev.event_time)} &middot; ${escapeHtml(ev.venue)}</div>
         <p class="event-desc">${escapeHtml(ev.description || '')}</p>
+        <div class="btn-row">
+          <button type="button" class="btn-secondary" data-details="${escapeHtml(ev.id)}">View details</button>
+        </div>
       </article>
     `).join('');
+
+    container.querySelectorAll('[data-details]').forEach(button => {
+      button.onclick = () => { location.hash = `#/events/${button.dataset.details}`; };
+    });
   } catch {
     container.innerHTML = '<p>Unable to load events right now.</p>';
   }
@@ -333,6 +357,187 @@ $('clear-search')?.addEventListener('click', () => {
   $('search-date').value = '';
   loadEvents();
 });
+function formatWhen(date, time) {
+  const parsed = new Date(`${date}T${time}`);
+  if (Number.isNaN(parsed.getTime())) return `${date} at ${time}`;
+  return parsed.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function spotsLabel(event) {
+  if (event.remaining_spots <= 0) return 'Event full';
+  return `${event.remaining_spots} of ${event.capacity} spots left`;
+}
+
+function setPanelVisible(id, visible) {
+  const panel = $(id);
+  if (panel) panel.style.display = visible ? '' : 'none';
+}
+
+function registrationButton(event) {
+  if (event.status !== 'active' || event.has_started) return '';
+  if (event.is_registered) return '<button class="submit" id="register-button" type="button" data-registered="true">Cancel registration</button>';
+  if (event.remaining_spots > 0) return '<button class="submit" id="register-button" type="button" data-registered="false">Register for this event</button>';
+  return '';
+}
+
+function registrationNotice(event) {
+  if (event.status !== 'active') return '<p class="message">This event was cancelled by the organizer.</p>';
+  if (event.has_started) return '<p class="message">This event has already started. Registration is closed.</p>';
+  if (!event.is_registered && event.remaining_spots <= 0) return '<p class="message">This event is full. Registration is closed.</p>';
+  if (event.is_registered) return '<p class="message success">You have a spot reserved for this event.</p>';
+  return '';
+}
+
+function renderDetail(event) {
+  $('detail-crumb').textContent = event.title;
+  $('detail-body').innerHTML = `
+    <div class="detail-grid">
+      <div class="card">
+        <span class="eyebrow">${escapeHtml(event.category)}</span>
+        <h2>${escapeHtml(event.title)}</h2>
+        <div class="detail-meta">
+          <div><strong>Date and time</strong>${escapeHtml(formatWhen(event.event_date, event.event_time))}</div>
+          <div><strong>Location</strong>${escapeHtml(event.venue)}</div>
+          <div><strong>Organized by</strong>${escapeHtml(event.organizer_name)}</div>
+        </div>
+        <div><strong>About this event</strong><p class="event-desc">${escapeHtml(event.description || '')}</p></div>
+      </div>
+      <div class="card">
+        <span class="eyebrow">Availability</span>
+        <p class="capacity-figure">${escapeHtml(String(event.remaining_spots))}</p>
+        <p class="spots ${event.remaining_spots > 0 ? '' : 'full'}">${escapeHtml(spotsLabel(event))}</p>
+        <div class="detail-meta">
+          <div><strong>Total capacity</strong>${escapeHtml(String(event.capacity))}</div>
+          <div><strong>Already registered</strong>${escapeHtml(String(event.registered_count))}</div>
+        </div>
+        ${registrationButton(event)}
+        ${registrationNotice(event)}
+        <p class="message" id="register-message" role="status" aria-live="polite"></p>
+      </div>
+    </div>`;
+  const register = $('register-button');
+  if (register) {
+    register.onclick = () => changeRegistration(event.id, register.dataset.registered === 'true');
+  }
+}
+
+async function changeRegistration(eventId, registered) {
+  const button = $('register-button');
+  const message = $('register-message');
+  button.disabled = true;
+  message.textContent = '';
+  message.classList.remove('success');
+  try {
+    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/register`, { method: registered ? 'DELETE' : 'POST' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    renderDetail(result.event);
+    const refreshed = $('register-message');
+    refreshed.classList.add('success');
+    refreshed.textContent = registered ? 'Your registration was cancelled.' : 'Your spot is saved.';
+  } catch (error) {
+    message.textContent = error.message || 'Unable to update your registration.';
+    button.disabled = false;
+  }
+}
+
+async function loadDetail(id) {
+  $('detail-crumb').textContent = 'Event';
+  $('detail-body').innerHTML = '<div class="card"><p>Loading event details...</p></div>';
+  try {
+    const response = await fetch(`/api/events/${encodeURIComponent(id)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    renderDetail(data.event);
+  } catch (error) {
+    $('detail-body').innerHTML = `<div class="card"><h2>Event unavailable</h2><p>${escapeHtml(error.message || 'This event could not be loaded.')}</p><p><a href="#browse-events">Back to browse events</a></p></div>`;
+  }
+}
+
+function myRegistrationCard(event) {
+  const canceled = event.status !== 'active';
+  return `
+    <article class="event-item ${canceled ? 'canceled' : ''}">
+      <div class="event-head">
+        <h3 class="event-title">${escapeHtml(event.title)}</h3>
+        <span class="badge ${canceled ? 'badge-canceled' : 'badge-active'}">${escapeHtml(canceled ? 'canceled' : event.category)}</span>
+      </div>
+      <div class="event-meta">${escapeHtml(formatWhen(event.event_date, event.event_time))}</div>
+      <div class="event-meta">${escapeHtml(event.venue)}</div>
+      ${canceled ? '<div class="event-meta">The organizer cancelled this event.</div>' : ''}
+      ${event.has_started ? '<div class="event-meta">This event has already started.</div>' : ''}
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" data-view="${escapeHtml(event.id)}">View details</button>
+        ${event.has_started ? '' : `<button type="button" class="btn-danger" data-cancel-registration="${escapeHtml(event.id)}">Cancel registration</button>`}
+      </div>
+    </article>`;
+}
+
+async function cancelRegistrationFromList(button) {
+  const message = $('my-registrations-message');
+  button.disabled = true;
+  message.textContent = '';
+  message.classList.remove('success');
+  try {
+    const response = await fetch(`/api/events/${encodeURIComponent(button.dataset.cancelRegistration)}/register`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    await loadMyRegistrations();
+    const refreshed = $('my-registrations-message');
+    refreshed.classList.add('success');
+    refreshed.textContent = 'Your registration was cancelled.';
+  } catch (error) {
+    message.textContent = error.message || 'Unable to cancel your registration.';
+    button.disabled = false;
+  }
+}
+
+async function loadMyRegistrations() {
+  const container = $('my-registrations-list');
+  $('my-registrations-message').textContent = '';
+  $('my-registrations-message').classList.remove('success');
+  try {
+    const response = await fetch('/api/my-registrations');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    const registered = data.events || [];
+    $('my-registrations-count').textContent = registered.length
+      ? `You are registered for ${registered.length} event${registered.length === 1 ? '' : 's'}`
+      : '';
+    if (!registered.length) {
+      container.innerHTML = '<div class="empty"><p><strong>You have not registered for any events yet.</strong></p><p><a href="#browse-events">Browse upcoming events</a> to find something to join.</p></div>';
+      return;
+    }
+    container.innerHTML = registered.map(myRegistrationCard).join('');
+    container.querySelectorAll('[data-view]').forEach(button => {
+      button.onclick = () => { location.hash = `#/events/${button.dataset.view}`; };
+    });
+    container.querySelectorAll('[data-cancel-registration]').forEach(button => {
+      button.onclick = () => cancelRegistrationFromList(button);
+    });
+  } catch (error) {
+    $('my-registrations-count').textContent = '';
+    container.innerHTML = `<div class="empty">${escapeHtml(error.message || 'Unable to load your registrations right now.')}</div>`;
+  }
+}
+
+function showView() {
+  const signedIn = Boolean(currentUser);
+  const isOrganizer = signedIn && currentUser.role === 'organizer';
+  const detailRoute = location.hash.match(/^#\/events\/([a-zA-Z0-9-]+)$/);
+  const showingDetail = signedIn && Boolean(detailRoute);
+  const showingMyEvents = signedIn && location.hash === '#/my-events';
+  setPanelVisible('nav-my-events', signedIn);
+  setPanelVisible('detail-panel', showingDetail);
+  setPanelVisible('my-registrations-panel', showingMyEvents);
+  setPanelVisible('browse-events', signedIn && !showingDetail && !showingMyEvents);
+  setPanelVisible('organizer-panel', isOrganizer && !showingDetail && !showingMyEvents);
+  if (showingDetail) loadDetail(detailRoute[1]);
+  if (showingMyEvents) loadMyRegistrations();
+}
+
+window.addEventListener('hashchange', showView);
+
 fetch('/api/session').then(r => r.json()).then(data => showUser(data.user)).catch(() => { $('message').textContent = 'Unable to connect to the server.'; });
 </script>
 </body>
