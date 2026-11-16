@@ -24,7 +24,6 @@ jobs:
           node-version: '22'
       - name: Apply D1 migrations, then deploy Worker
         run: |
-          npx --yes wrangler@4.161.0 d1 execute seps-db --remote --file=scripts/bootstrap-d1.sql
           npx --yes wrangler@4.161.0 d1 migrations apply seps-db --remote
           npx --yes wrangler@4.161.0 deploy
         env:
