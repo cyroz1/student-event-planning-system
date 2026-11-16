@@ -1,4 +1,4 @@
-# Person 5 Contribution: Event Notifications
+# Person 5 Contribution: Event Notification
 ## Summary
 
 This contribution implements FR5. Registered users get notifications within the application of their registration confirmation, event updates and event cancellations. These notifications are created using the server code and can only be viewed by the logged-in user.
