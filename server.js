@@ -214,6 +214,7 @@ http.createServer(async (req, res) => {
         if (registrationCount(all, eventId) >= eventCapacity(event)) return send(res, 400, { error: 'This event is full. Registration is closed.' });
         all.push({ id: crypto.randomUUID(), user_id: viewer.id, event_id: eventId, registered_at: Date.now() });
         saveRegistrations(all);
+        notify(viewer.id, 'registration_confirmation', `You are registered for "${event.title}".`, eventId);
         if (event.organizer_id !== viewer.id) notify(event.organizer_id, 'registration', `${viewer.name} registered for your event "${event.title}".`, eventId);
         return send(res, 201, { event: eventDetail(event, all, viewer.id) });
       }

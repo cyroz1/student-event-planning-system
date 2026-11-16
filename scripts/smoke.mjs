@@ -77,6 +77,9 @@ try {
   const notif2 = await call('GET', '/api/notifications', { cookie: org.cookie });
   check('unread cleared', notif2.data.unread === 0, JSON.stringify(notif2.data.unread));
 
+  const notifA0 = await call('GET', '/api/notifications', { cookie: a.cookie });
+  check('student A got registration confirmation', notifA0.data.notifications.some(n => n.type === 'registration_confirmation' && n.message.includes('You are registered')), JSON.stringify(notifA0.data));
+
   const unregB = await call('DELETE', `/api/events/${eventId}/register`, { cookie: b.cookie });
   check('student B unregisters, spot reopens', unregB.status === 200 && unregB.data.event.remaining_spots === 1, `got ${unregB.status}`);
 

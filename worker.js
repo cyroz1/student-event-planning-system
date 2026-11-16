@@ -170,6 +170,7 @@ export default { async fetch(request, env) {
           throw error;
         }
         if (!inserted.meta.changes) return json({ error: 'This event is full. Registration is closed.' }, 400);
+        await notify(env.DB, viewer.id, 'registration_confirmation', `You are registered for "${event.title}".`, eventId);
         if (event.organizer_id !== viewer.id) await notify(env.DB, event.organizer_id, 'registration', `${viewer.name} registered for your event "${event.title}".`, eventId);
         return json({ event: eventDetailPayload(await eventDetailRow(env.DB, eventId, viewer.id)) }, 201);
       }
