@@ -68,7 +68,23 @@ function validateEvent(input) {
   if (!/^\d{2}:\d{2}$/.test(event_time)) return { error: 'Enter a valid event time (HH:MM).' };
   if (!venue || venue.length > 120) return { error: 'Enter a venue (up to 120 characters).' };
   if (!description || description.length > 1000) return { error: 'Enter a description (up to 1000 characters).' };
-  return { data: { title, category, event_date, event_time, venue, description } };
+  let capacity = DEFAULT_CAPACITY;
+  if (input?.capacity !== undefined && input?.capacity !== null && input?.capacity !== '') {
+    capacity = Number(input.capacity);
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 10000) return { error: 'Enter a capacity between 1 and 10000.' };
+  }
+  return { data: { title, category, event_date, event_time, venue, description, capacity } };
+}
+async function notify(db, userId, type, message, eventId) {
+  if (!userId) return;
+  try {
+    await db.prepare('INSERT INTO notifications (id, user_id, event_id, type, message, is_read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)')
+      .bind(crypto.randomUUID(), userId, eventId || null, type, message, Date.now()).run();
+  } catch (error) { console.error('notify failed', error); }
+}
+async function notifyRegistrants(db, eventId, type, message) {
+  const { results } = await db.prepare('SELECT user_id FROM event_registrations WHERE event_id = ?').bind(eventId).all();
+  for (const row of results || []) await notify(db, row.user_id, type, message, eventId);
 }
 export default { async fetch(request, env) {
   const url = new URL(request.url);
@@ -80,8 +96,25 @@ export default { async fetch(request, env) {
   try {
     if (request.method === 'GET' && url.pathname === '/api/session') return json({ user: await session(request, env.DB) });
     if (request.method === 'GET' && url.pathname === '/api/events') {
-      const { results } = await env.DB.prepare('SELECT * FROM events ORDER BY event_date ASC, event_time ASC').all();
-      return json({ events: results || [] });
+      const viewer = await session(request, env.DB);
+      const category = url.searchParams.get('category') || '';
+      const date = url.searchParams.get('date') || '';
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const conditions = [];
+      const binds = [viewer?.id || ''];
+      if (category && CATEGORIES.includes(category)) { conditions.push('events.category = ?'); binds.push(category); }
+      if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) { conditions.push('events.event_date = ?'); binds.push(date); }
+      if (q) { conditions.push('(LOWER(events.title) LIKE ? OR LOWER(events.description) LIKE ? OR LOWER(events.venue) LIKE ?)'); binds.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const { results } = await env.DB.prepare(`SELECT ${EVENT_DETAIL_COLUMNS}, events.organizer_id, events.created_at, events.updated_at FROM events LEFT JOIN users ON users.id = events.organizer_id ${where} ORDER BY events.event_date ASC, events.event_time ASC`).bind(...binds).all();
+      return json({ events: (results || []).map(row => eventDetailPayload(row)) });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/notifications') {
+      const viewer = await session(request, env.DB);
+      if (!viewer) return json({ error: 'You must be logged in to view notifications.' }, 401);
+      const { results } = await env.DB.prepare('SELECT id, event_id, type, message, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(viewer.id).all();
+      const list = (results || []).map(row => ({ ...row, is_read: Boolean(row.is_read) }));
+      return json({ notifications: list, unread: list.filter(row => !row.is_read).length });
     }
     if (request.method === 'GET' && url.pathname === '/api/my-registrations') {
       const viewer = await session(request, env.DB);
@@ -105,12 +138,18 @@ export default { async fetch(request, env) {
       const value = token(request); if (value) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hash(value)).run();
       return json({ ok: true }, 200, { 'Set-Cookie': 'session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' });
     }
+    if (request.method === 'POST' && url.pathname === '/api/notifications/read') {
+      const viewer = await session(request, env.DB);
+      if (!viewer) return json({ error: 'You must be logged in.' }, 401);
+      await env.DB.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0').bind(viewer.id).run();
+      return json({ ok: true, unread: 0 });
+    }
     const registerMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)\/register$/);
     if (registerMatch && (request.method === 'POST' || request.method === 'DELETE')) {
       const viewer = await session(request, env.DB);
       if (!viewer) return json({ error: 'You must be logged in to register for an event.' }, 401);
       const eventId = registerMatch[1];
-      const event = await env.DB.prepare('SELECT id, status, event_date, event_time, capacity FROM events WHERE id = ?').bind(eventId).first();
+      const event = await env.DB.prepare('SELECT id, organizer_id, title, status, event_date, event_time, capacity FROM events WHERE id = ?').bind(eventId).first();
       if (!event) return json({ error: 'Event not found.' }, 404);
       const moment = currentMoment();
       if (request.method === 'POST') {
@@ -131,11 +170,13 @@ export default { async fetch(request, env) {
           throw error;
         }
         if (!inserted.meta.changes) return json({ error: 'This event is full. Registration is closed.' }, 400);
+        if (event.organizer_id !== viewer.id) await notify(env.DB, event.organizer_id, 'registration', `${viewer.name} registered for your event "${event.title}".`, eventId);
         return json({ event: eventDetailPayload(await eventDetailRow(env.DB, eventId, viewer.id)) }, 201);
       }
       if (!hasNotStarted(event, moment)) return json({ error: 'This event has already started. Your registration can no longer be cancelled.' }, 400);
       const removed = await env.DB.prepare('DELETE FROM event_registrations WHERE event_id = ? AND user_id = ?').bind(eventId, viewer.id).run();
       if (!removed.meta.changes) return json({ error: 'You are not registered for this event.' }, 404);
+      if (event.organizer_id !== viewer.id) await notify(env.DB, event.organizer_id, 'registration_canceled', `${viewer.name} canceled their registration for your event "${event.title}".`, eventId);
       return json({ event: eventDetailPayload(await eventDetailRow(env.DB, eventId, viewer.id)) });
     }
     if (url.pathname === '/api/events' || url.pathname.startsWith('/api/events/')) {
@@ -150,7 +191,7 @@ export default { async fetch(request, env) {
         if (check.error) return json({ error: check.error }, 400);
         const now = Date.now();
         const event = { id: crypto.randomUUID(), organizer_id: user.id, ...check.data, status: 'active', created_at: now, updated_at: now };
-        await env.DB.prepare('INSERT INTO events (id, organizer_id, title, category, event_date, event_time, venue, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(event.id, event.organizer_id, event.title, event.category, event.event_date, event.event_time, event.venue, event.description, event.status, event.created_at, event.updated_at).run();
+        await env.DB.prepare('INSERT INTO events (id, organizer_id, title, category, event_date, event_time, venue, description, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(event.id, event.organizer_id, event.title, event.category, event.event_date, event.event_time, event.venue, event.description, event.capacity, event.status, event.created_at, event.updated_at).run();
         return json({ event }, 201);
       }
 
@@ -164,7 +205,8 @@ export default { async fetch(request, env) {
         const check = validateEvent(input);
         if (check.error) return json({ error: check.error }, 400);
         const updated_at = Date.now();
-        await env.DB.prepare('UPDATE events SET title = ?, category = ?, event_date = ?, event_time = ?, venue = ?, description = ?, updated_at = ? WHERE id = ?').bind(check.data.title, check.data.category, check.data.event_date, check.data.event_time, check.data.venue, check.data.description, updated_at, existing.id).run();
+        await env.DB.prepare('UPDATE events SET title = ?, category = ?, event_date = ?, event_time = ?, venue = ?, description = ?, capacity = ?, updated_at = ? WHERE id = ?').bind(check.data.title, check.data.category, check.data.event_date, check.data.event_time, check.data.venue, check.data.description, check.data.capacity, updated_at, existing.id).run();
+        await notifyRegistrants(env.DB, existing.id, 'event_updated', `The event "${check.data.title}" you registered for was updated by its organizer.`, existing.id);
         return json({ event: { ...existing, ...check.data, updated_at } });
       }
 
@@ -175,6 +217,7 @@ export default { async fetch(request, env) {
         if (existing.organizer_id !== user.id) return json({ error: 'You can only cancel your own events.' }, 403);
         const updated_at = Date.now();
         await env.DB.prepare("UPDATE events SET status = 'canceled', updated_at = ? WHERE id = ?").bind(updated_at, existing.id).run();
+        await notifyRegistrants(env.DB, existing.id, 'event_canceled', `The event "${existing.title}" you registered for was canceled by its organizer.`, existing.id);
         return json({ event: { ...existing, status: 'canceled', updated_at } });
       }
       return json({ error: 'Not found.' }, 404);

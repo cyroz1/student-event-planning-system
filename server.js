@@ -8,17 +8,30 @@ const root = __dirname;
 const dataPath = path.join(root, 'data', 'users.json');
 const eventsPath = path.join(root, 'data', 'events.json');
 const registrationsPath = path.join(root, 'data', 'registrations.json');
+const notificationsPath = path.join(root, 'data', 'notifications.json');
 const sessions = new Map();
 const port = Number(process.env.PORT) || 3000;
 fs.mkdirSync(path.dirname(dataPath), { recursive: true });
 if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, '[]', { mode: 0o600 });
 if (!fs.existsSync(eventsPath)) fs.writeFileSync(eventsPath, '[]', { mode: 0o600 });
 if (!fs.existsSync(registrationsPath)) fs.writeFileSync(registrationsPath, '[]', { mode: 0o600 });
+if (!fs.existsSync(notificationsPath)) fs.writeFileSync(notificationsPath, '[]', { mode: 0o600 });
 function users() { return JSON.parse(fs.readFileSync(dataPath, 'utf8')); }
 function events() { return JSON.parse(fs.readFileSync(eventsPath, 'utf8')); }
 function saveEvents(list) { fs.writeFileSync(eventsPath, JSON.stringify(list, null, 2), { mode: 0o600 }); }
 function registrations() { return JSON.parse(fs.readFileSync(registrationsPath, 'utf8')); }
 function saveRegistrations(list) { fs.writeFileSync(registrationsPath, JSON.stringify(list, null, 2), { mode: 0o600 }); }
+function notifications() { return JSON.parse(fs.readFileSync(notificationsPath, 'utf8')); }
+function saveNotifications(list) { fs.writeFileSync(notificationsPath, JSON.stringify(list, null, 2), { mode: 0o600 }); }
+function notify(userId, type, message, eventId) {
+  if (!userId) return;
+  const all = notifications();
+  all.push({ id: crypto.randomUUID(), user_id: userId, event_id: eventId || null, type, message, is_read: false, created_at: Date.now() });
+  saveNotifications(all);
+}
+function notifyRegistrants(eventId, type, message) {
+  for (const row of registrations().filter(r => r.event_id === eventId)) notify(row.user_id, type, message, eventId);
+}
 function send(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
 function current(req) {
   const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('session='))?.slice(8);
@@ -46,7 +59,12 @@ function validateEvent(input) {
   if (!/^\d{2}:\d{2}$/.test(event_time)) return { error: 'Enter a valid event time (HH:MM).' };
   if (!venue || venue.length > 120) return { error: 'Enter a venue (up to 120 characters).' };
   if (!description || description.length > 1000) return { error: 'Enter a description (up to 1000 characters).' };
-  return { data: { title, category, event_date, event_time, venue, description } };
+  let capacity = DEFAULT_CAPACITY;
+  if (input?.capacity !== undefined && input?.capacity !== null && input?.capacity !== '') {
+    capacity = Number(input.capacity);
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 10000) return { error: 'Enter a capacity between 1 and 10000.' };
+  }
+  return { data: { title, category, event_date, event_time, venue, description, capacity } };
 }
 const DEFAULT_CAPACITY = 50;
 function eventCapacity(event) {
@@ -100,7 +118,7 @@ http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (req.method === 'GET' && url.pathname === '/logo.svg') { res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); return res.end(fs.readFileSync(path.join(root, 'logo.svg'))); }
-    if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync(path.join(root, 'index.html'))); }
+    if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync(path.join(root, 'public', 'index.html'))); }
     if (req.method === 'GET' && url.pathname === '/api/session') return send(res, 200, { user: current(req) });
     if (req.method === 'GET' && url.pathname === '/api/events') {
   const category = url.searchParams.get('category') || '';
@@ -125,8 +143,38 @@ http.createServer(async (req, res) => {
   const sorted = list.sort((a, b) =>
     `${a.event_date} ${a.event_time}`.localeCompare(`${b.event_date} ${b.event_time}`)
   );
-  return send(res, 200, { events: sorted });
+  const regs = registrations();
+  const names = organizerNames();
+  const viewerId = current(req)?.id;
+  const enriched = sorted.map(e => {
+    const capacity = eventCapacity(e);
+    const registered_count = registrationCount(regs, e.id);
+    return {
+      ...e,
+      capacity,
+      registered_count,
+      remaining_spots: Math.max(0, capacity - registered_count),
+      is_registered: isRegistered(regs, e.id, viewerId),
+      organizer_name: names.get(e.organizer_id) || 'Campus organizer',
+      has_started: !hasNotStarted(e, currentMoment())
+    };
+  });
+  return send(res, 200, { events: enriched });
 }
+    if (req.method === 'GET' && url.pathname === '/api/notifications') {
+      const viewer = current(req);
+      if (!viewer) return send(res, 401, { error: 'You must be logged in to view notifications.' });
+      const list = notifications().filter(n => n.user_id === viewer.id).sort((a, b) => b.created_at - a.created_at).slice(0, 50);
+      return send(res, 200, { notifications: list, unread: list.filter(n => !n.is_read).length });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/notifications/read') {
+      const viewer = current(req);
+      if (!viewer) return send(res, 401, { error: 'You must be logged in.' });
+      const all = notifications();
+      for (const n of all) if (n.user_id === viewer.id) n.is_read = true;
+      saveNotifications(all);
+      return send(res, 200, { ok: true, unread: 0 });
+    }
     if (req.method === 'GET' && url.pathname === '/api/my-registrations') {
       const viewer = current(req);
       if (!viewer) return send(res, 401, { error: 'You must be logged in to view your registrations.' });
@@ -166,6 +214,7 @@ http.createServer(async (req, res) => {
         if (registrationCount(all, eventId) >= eventCapacity(event)) return send(res, 400, { error: 'This event is full. Registration is closed.' });
         all.push({ id: crypto.randomUUID(), user_id: viewer.id, event_id: eventId, registered_at: Date.now() });
         saveRegistrations(all);
+        if (event.organizer_id !== viewer.id) notify(event.organizer_id, 'registration', `${viewer.name} registered for your event "${event.title}".`, eventId);
         return send(res, 201, { event: eventDetail(event, all, viewer.id) });
       }
       if (!hasNotStarted(event, moment)) return send(res, 400, { error: 'This event has already started. Your registration can no longer be cancelled.' });
@@ -174,6 +223,7 @@ http.createServer(async (req, res) => {
       if (index === -1) return send(res, 404, { error: 'You are not registered for this event.' });
       all.splice(index, 1);
       saveRegistrations(all);
+      if (event.organizer_id !== viewer.id) notify(event.organizer_id, 'registration_canceled', `${viewer.name} canceled their registration for your event "${event.title}".`, eventId);
       return send(res, 200, { event: eventDetail(event, all, viewer.id) });
     }
     const detailMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)$/);
@@ -210,6 +260,7 @@ http.createServer(async (req, res) => {
         if (check.error) return send(res, 400, { error: check.error });
         all[idx] = { ...all[idx], ...check.data, updated_at: Date.now() };
         saveEvents(all);
+        notifyRegistrants(editMatch[1], 'event_updated', `The event "${check.data.title}" you registered for was updated by its organizer.`);
         return send(res, 200, { event: all[idx] });
       }
       const cancelMatch = url.pathname.match(/^\/api\/events\/([a-zA-Z0-9-]+)\/cancel$/);
@@ -220,6 +271,7 @@ http.createServer(async (req, res) => {
         if (all[idx].organizer_id !== user.id) return send(res, 403, { error: 'You can only cancel your own events.' });
         all[idx] = { ...all[idx], status: 'canceled', updated_at: Date.now() };
         saveEvents(all);
+        notifyRegistrants(cancelMatch[1], 'event_canceled', `The event "${all[idx].title}" you registered for was canceled by its organizer.`);
         return send(res, 200, { event: all[idx] });
       }
       return send(res, 404, { error: 'Not found.' });
